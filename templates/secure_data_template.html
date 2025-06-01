@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Secure Data Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #content { display: none; margin-top: 20px; }
+        label { font-weight: bold; }
+        input[type=password] { padding: 5px; width: 200px; }
+        button { padding: 5px 10px; margin-left: 5px; }
+        pre { background: #f4f4f4; padding: 10px; border: 1px solid #ddd; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Enter PIN to View Secure Data</h2>
+    <label for="pinInput">PIN:</label>
+    <input type="password" id="pinInput" maxlength="8" />
+    <button onclick="decryptData()">Unlock</button>
+    <div id="error" style="color:red; margin-top:10px;"></div>
+    <div id="content">
+        <h3>Decrypted Data</h3>
+        <pre id="output"></pre>
+    </div>
+
+<script>
+    const encrypted = {{ encrypted|safe }};
+    function decryptData() {
+        const pin = document.getElementById('pinInput').value;
+        const salt = CryptoJS.enc.Utf8.parse('healthSalt123');
+        const key = CryptoJS.PBKDF2(pin, salt, { keySize: 256/32, iterations: 100000 });
+        try {
+            const iv = CryptoJS.enc.Base64.parse(encrypted.iv);
+            const ciphertext = CryptoJS.enc.Base64.parse(encrypted.cipher);
+            const tag = CryptoJS.enc.Base64.parse(encrypted.tag);
+            const decrypted = CryptoJS.AES.decrypt(
+                { ciphertext: ciphertext, salt: null },
+                key,
+                { iv: iv, mode: CryptoJS.mode.GCM, padding: CryptoJS.pad.NoPadding, tag: tag }
+            );
+            const plaintext = decrypted.toString(CryptoJS.enc.Utf8);
+            if (!plaintext) throw new Error('Invalid PIN or corrupted data');
+            document.getElementById('output').textContent = plaintext;
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('error').textContent = '';
+        } catch (e) {
+            document.getElementById('error').textContent = 'Decryption failed: incorrect PIN.';
+            document.getElementById('content').style.display = 'none';
+        }
+    }
+</script>
+</body>
+</html>

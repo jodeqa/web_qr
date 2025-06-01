@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Code Generator & Card Editor</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .tabs { margin-bottom: 20px; }
+    .tabs button {
+      padding: 10px 20px;
+      margin-right: 5px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      background: #f7f7f7;
+      border-bottom: none;
+    }
+    .tabs button.active {
+      background: white;
+      border-bottom: 1px solid white;
+    }
+    .tab-content {
+      border: 1px solid #ccc;
+      padding: 20px;
+      display: none;
+      background: white;
+    }
+    .tab-content.active { display: block; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    select, input[type=text], textarea, input[type=file], input[type=password] {
+      width: 300px; padding: 5px; margin-top: 5px;
+    }
+    #dimensionDisplay, #counter { margin-top: 5px; font-size: 0.9em; color: #555; }
+    .template-buttons { margin-top: 30px; }
+    .template-buttons a {
+      display: inline-block;
+      margin-right: 10px;
+      padding: 8px 16px;
+      background: #007bff;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    .template-buttons a:hover { background: #0056b3; }
+
+    /* ======= Card Editor Styles ======= */
+    #cardCanvas {
+      width: 430px;   /* 86mm × 300dpi ÷ 25.4 ≈ 1015px; scaled ≈ 2.36× smaller for screen */
+      height: 270px;  /* 54mm × 300dpi ÷ 25.4 ≈ 638px; scaled similarly */
+      border: 2px solid #333;
+      background: #fff;
+      position: relative;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    #editorToolbar {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .draggable {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+    }
+    .textElement {
+      background: rgba(255, 255, 255, 0.8);
+      padding: 4px 6px;
+      border: 1px dashed #888;
+      min-width: 60px;
+      min-height: 20px;
+      white-space: nowrap;
+      content-editable: false;
+    }
+    .textElement[contenteditable="true"] {
+      outline: 1px dashed #666;
+    }
+    .qrContainer {
+      resize: both;
+      overflow: auto;
+      max-width: 200px;
+      max-height: 200px;
+      border: 1px dashed #888;
+      background: white;
+      position: absolute;
+    }
+    .qrElement {
+      width: 100%;
+      height: 100%;
+      display: block;
+      user-select: none;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>QR Code Generator & Card Editor</h2>
+  <div class="tabs">
+    <button data-tab="freeTextTab" class="active">Free Text</button>
+    <button data-tab="emergencyTab">Emergency Info</button>
+    <button data-tab="structuredTab">Structured vCard/Medical</button>
+    <button data-tab="secureTab">Secure Data (PIN)</button>
+    <button data-tab="editorTab">Card Editor</button>
+  </div>
+
+  <form id="qrForm" action="/generate" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="mode" id="mode" value="free_text" />
+
+    <!-- ========== Free Text Tab ========== -->
+    <div id="freeTextTab" class="tab-content active">
+      <label>Text to Encode:</label>
+      <textarea id="ft_text" rows="4" placeholder="Enter up to max chars..."></textarea>
+      <div id="counter_ft">Remaining: – characters</div>
+    </div>
+
+    <!-- ========== Emergency Info Tab ========== -->
+    <div id="emergencyTab" class="tab-content">
+      <label>Full Name:</label><input type="text" id="em_name" placeholder="John Doe" />
+      <label>Address:</label><input type="text" id="em_address" placeholder="123 Main St, City" />
+      <label>Family Name:</label><input type="text" id="em_family_name" placeholder="Jane Doe" />
+      <label>Family Phone:</label><input type="text" id="em_family_phone" placeholder="+62-812-3456-7890" />
+      <label>Blood Type:</label>
+      <select id="em_blood">
+        {% for bt in blood_types %}<option value="{{ bt }}">{{ bt }}</option>{% endfor %}
+      </select>
+      <label>Health History:</label><textarea id="em_history" rows="3" placeholder="Allergies, conditions..."></textarea>
+      <div id="counter_em">&nbsp;</div>
+    </div>
+
+    <!-- ========== Structured vCard/Medical Tab ========== -->
+    <div id="structuredTab" class="tab-content">
+      <label>Name:</label><input type="text" id="sv_name" placeholder="John Doe" />
+      <label>Phone:</label><input type="text" id="sv_phone" placeholder="+62-812-3456-7890" />
+      <label>Address:</label><input type="text" id="sv_address" placeholder="123 Main St, City" />
+      <label>Email:</label><input type="text" id="sv_email" placeholder="jdoe@example.com" />
+      <label>Blood Type:</label>
+      <select id="sv_blood">
+        {% for bt in blood_types %}<option value="{{ bt }}">{{ bt }}</option>{% endfor %}
+      </select>
+      <label>Allergies:</label><input type="text" id="sv_allergies" placeholder="Penicillin, Peanuts" />
+      <label>Medications:</label><input type="text" id="sv_medications" placeholder="Metformin, Lisinopril" />
+      <label>Chronic Conditions:</label><input type="text" id="sv_conditions" placeholder="Hypertension, Diabetes" />
+      <label>Primary Doctor:</label><input type="text" id="sv_doctor" placeholder="Dr. Rina" />
+      <label>Doctor Phone:</label><input type="text" id="sv_doctor_phone" placeholder="+62-21-1234-5678" />
+    </div>
+
+    <!-- ========== Secure Data Tab ========== -->
+    <div id="secureTab" class="tab-content">
+      <label>Name:</label><input type="text" id="sc_name" placeholder="John Doe" />
+      <label>Address:</label><input type="text" id="sc_address" placeholder="123 Main St, City" />
+      <label>Emergency Contact Name:</label><input type="text" id="sc_ec_name" placeholder="Jane Doe" />
+      <label>Emergency Contact Phone:</label><input type="text" id="sc_ec_phone" placeholder="+62-812-3456-7890" />
+      <label>Medical Info:</label><textarea id="sc_medical" rows="3" placeholder="Allergies, insurances..."></textarea>
+      <label>Blood Type:</label>
+      <select id="sc_blood">
+        {% for bt in blood_types %}<option value="{{ bt }}">{{ bt }}</option>{% endfor %}
+      </select>
+      <label>PIN (4–8 digits):</label><input type="password" id="sc_pin" maxlength="8" />
+      <div id="counter_sc">&nbsp;</div>
+    </div>
+
+    <!-- ========== Card Editor Tab ========== -->
+    <div id="editorTab" class="tab-content">
+      <div id="editorToolbar">
+        <button type="button" id="addTextBtn">Add Text</button>
+        <button type="button" id="addQrBtn">Upload QR</button>
+        <input type="file" id="qrUploader" accept="image/png, image/jpeg" style="display: none;" />
+      </div>
+      <div id="cardCanvas"></div>
+      <div style="font-size:0.85em; color:#555; margin-top:8px; text-align:center;">
+        (Drag items to reposition. Double‐click a text box to edit. Drag QR corners to resize.)
+      </div>
+    </div>
+
+    <!-- ========== Common Controls (all tabs) ========== -->
+    <label style="margin-top: 20px;">QR Version:</label>
+    <select name="version" id="version">
+      {% for v in versions %}<option value="{{ v }}">Version {{ v }}</option>{% endfor %}
+    </select>
+    <div id="dimensionDisplay">Dimensions: – mm × – mm</div>
+
+    <label>Error Correction Level:
+      <select name="ecc" id="ecc">
+        {% for e in ecc_choices %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <label>QR Color:</label>
+    <select name="color" id="color">
+      {% for c in color_choices %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    </select>
+    <div id="colorHint" style="font-size:0.9em;color:#555;">
+      "Black" = black modules on transparent (for light backgrounds).<br>
+      "White" = white modules on transparent (for dark backgrounds).
+    </div>
+
+    <label>Center Logo (optional):</label><input type="file" name="logo" id="logo" accept="image/*" />
+
+    <button type="submit" style="margin-top:20px;padding:10px 20px;">Generate QR</button>
+  </form>
+
+  <!-- Template Download Buttons -->
+  <div class="template-buttons">
+    <h3>Download 86 mm × 54 mm Card Template</h3>
+    <a href="/template?color=white">Download White Card (for Black QR)</a>
+    <a href="/template?color=black">Download Black Card (for White QR)</a>
+  </div>
+
+  <script>
+    // ===== Tab Switching Logic =====
+    const tabButtons = document.querySelectorAll('.tabs button');
+    tabButtons.forEach(btn => btn.addEventListener('click', () => {
+      tabButtons.forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+      const tabId = btn.dataset.tab;
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+      document.getElementById('mode').value = tabId.replace('Tab', '');
+      updateCounter();
+    }));
+
+    // ===== Capacity / Character Counter =====
+    const versionSelect = document.getElementById('version');
+    const eccSelect = document.getElementById('ecc');
+    const dimensionDisplay = document.getElementById('dimensionDisplay');
+    let maxChars = 0;
+
+    async function updateCapacity() {
+      const version = versionSelect.value;
+      const ecc = eccSelect.value;
+      const resp = await fetch(`/capacity?version=${version}&ecc=${ecc}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      dimensionDisplay.textContent = `Dimensions: ${data.dimension_mm} mm × ${data.dimension_mm} mm`;
+      maxChars = data.max_chars;
+      updateCounter();
+    }
+    versionSelect.addEventListener('change', updateCapacity);
+    eccSelect.addEventListener('change', updateCapacity);
+
+    // Free Text Counter
+    const ft_text = document.getElementById('ft_text');
+    const counter_ft = document.getElementById('counter_ft');
+    function updateCounter() {
+      const mode = document.getElementById('mode').value;
+      if (mode === 'freeText') {
+        const rem = maxChars - ft_text.value.length;
+        counter_ft.textContent = `Remaining: ${rem} characters`;
+      } else {
+        counter_ft.textContent = '';
+      }
+    }
+    ft_text.addEventListener('input', updateCounter);
+
+    // ===== On Submit, bundle form data =====
+    const form = document.getElementById('qrForm');
+    form.addEventListener('submit', (e) => {
+      const mode = document.getElementById('mode').value;
+      if (mode === 'freeText') {
+        let hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'text';
+        hidden.value = ft_text.value;
+        form.appendChild(hidden);
+      } else if (mode === 'emergency') {
+        const obj = {
+          name: document.getElementById('em_name').value.trim(),
+          address: document.getElementById('em_address').value.trim(),
+          family: {
+            name: document.getElementById('em_family_name').value.trim(),
+            phone: document.getElementById('em_family_phone').value.trim()
+          },
+          blood_type: document.getElementById('em_blood').value,
+          health_history: document.getElementById('em_history').value.trim()
+        };
+        let hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'text';
+        hidden.value = JSON.stringify(obj);
+        form.appendChild(hidden);
+      }
+      // structured and secure are handled server-side
+    });
+
+    // ===== Initial load =====
+    updateCapacity();
+
+    // ===== Card Editor Logic =====
+    const cardCanvas = document.getElementById('cardCanvas');
+    const addTextBtn = document.getElementById('addTextBtn');
+    const addQrBtn = document.getElementById('addQrBtn');
+    const qrUploader = document.getElementById('qrUploader');
+
+    function makeElementDraggable(el) {
+      el.classList.add('draggable');
+      let isDragging = false;
+      let offsetX = 0, offsetY = 0;
+
+      el.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+
+        // Determine if click is in bottom-right "resize zone"
+        const rect = el.getBoundingClientRect();
+        const parentRect = cardCanvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        const resizeZoneSize = 15; // px
+        const withinResizeZone = (
+          clickX >= rect.width - resizeZoneSize &&
+          clickY >= rect.height - resizeZoneSize
+        );
+        if (withinResizeZone) {
+          // Let browser handle resize; do not start dragging
+          return;
+        }
+
+        // Otherwise start dragging
+        isDragging = true;
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const parentRect = cardCanvas.getBoundingClientRect();
+        let x = e.clientX - parentRect.left - offsetX;
+        let y = e.clientY - parentRect.top - offsetY;
+        x = Math.max(0, Math.min(x, cardCanvas.clientWidth - el.offsetWidth));
+        y = Math.max(0, Math.min(y, cardCanvas.clientHeight - el.offsetHeight));
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+      });
+
+      document.addEventListener('mouseup', () => { isDragging = false; });
+    }
+
+    // Add a new text box to the card
+    addTextBtn.addEventListener('click', () => {
+      const textEl = document.createElement('div');
+      textEl.className = 'textElement';
+      textEl.innerText = 'Edit me';
+      textEl.style.left = '10px';
+      textEl.style.top = '10px';
+      textEl.contentEditable = 'false';
+      cardCanvas.appendChild(textEl);
+      makeElementDraggable(textEl);
+
+      // Double-click to enable editing
+      textEl.addEventListener('dblclick', () => {
+        textEl.contentEditable = 'true';
+        textEl.focus();
+      });
+      // On blur, turn off editing
+      textEl.addEventListener('blur', () => {
+        textEl.contentEditable = 'false';
+      });
+    });
+
+    // Trigger file input when “Upload QR” is clicked
+    addQrBtn.addEventListener('click', () => {
+      qrUploader.click();
+    });
+
+    // When a file is chosen, create a resizable container with the QR image
+    qrUploader.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        // Create a container DIV
+        const container = document.createElement('div');
+        container.className = 'qrContainer draggable';
+        container.style.left = '10px';
+        container.style.top = '10px';
+        container.style.width = '100px';
+        container.style.height = '100px';
+
+        // Create the <img> inside, filling the container
+        const img = document.createElement('img');
+        img.className = 'qrElement';
+        img.src = evt.target.result;
+        container.appendChild(img);
+
+        cardCanvas.appendChild(container);
+        makeElementDraggable(container);
+      };
+      reader.readAsDataURL(file);
+      qrUploader.value = '';
+    });
+  </script>
+</body>
+</html>
