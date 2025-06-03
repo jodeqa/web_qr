@@ -10,6 +10,9 @@ import os
 from Cryptodome.Cipher import AES
 from Cryptodome.Protocol.KDF import PBKDF2
 from Cryptodome.Random import get_random_bytes
+import urllib.parse
+import html as html_escape_module
+
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # limit file uploads to 2MB
@@ -145,6 +148,7 @@ def generate():
     ecc = request.form.get('ecc')
     color = request.form.get('color', 'Black')
     logo_file = request.files.get('logo') if 'logo' in request.files else None
+    action = request.form.get('action', 'generate_qr')
 
     if mode == 'structured':
         # Extract each field, but guard against empty name (no IndexError)
@@ -207,8 +211,14 @@ def generate():
 
         b64_vcard = img_to_b64(qr1)
         b64_meta = img_to_b64(qr2)
-        return render_template('result.html', structured=True, qr_vcard=b64_vcard, qr_meta=b64_meta)
-
+        return render_template(
+                                'result.html',
+                                structured=True,
+                                qr_vcard=b64_vcard,
+                                qr_meta=b64_meta,
+                                color=color,
+                                version=version
+                                )
     elif mode == 'secure':
         secure_name = request.form.get('sc_name', '').strip()
         secure_data = {
@@ -268,15 +278,66 @@ def generate():
                     'health_history': ''
                 })
 
-        # Capacity check
-        if len(raw_text.encode('utf-8')) > CAPACITY_TABLE[version][ecc]:
-            return f"<h3>Error: data exceeds capacity for Version {version} ECC {ecc}.</h3>", 400
+        if action == 'generate_html_qr':
+            # 1) Wrap raw_text in an HTML page (inside <pre>) and percent-encode it
+            escaped = html_escape_module.escape(raw_text)
+            html_page = (
+                "<!DOCTYPE html>"
+                "<html lang='en'><head><meta charset='utf-8'><title>QR Data</title></head>"
+                "<body style='font-family:sans-serif; padding:20px;'>"
+                "<pre style='white-space:pre-wrap; word-wrap:break-word;'>"
+                f"{escaped}"
+                "</pre>"
+                "</body></html>"
+            )
+            data_uri = "data:text/html;charset=utf-8," + urllib.parse.quote(html_page)
+            payload = data_uri
 
-        qr_img = generate_qr_img(raw_text, version, ecc, color, logo_file)
-        buf = io.BytesIO()
-        qr_img.save(buf, format='PNG')
-        b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-        return render_template('result.html', structured=False, qr=b64)
+            # 2) Find smallest version 1–40 whose capacity ≥ len(payload_bytes)
+            payload_len = len(payload.encode('utf-8'))
+            chosen_version = None
+            for v in range(1, 41):
+                if CAPACITY_TABLE[v][ecc] >= payload_len:
+                    chosen_version = v
+                    break
+
+            if chosen_version is None:
+                # Too large for any QR version
+                return ("<h3>Error:</h3>"
+                        "<p>"
+                        "Your HTML‐wrapped content is too large for any QR version (even Version 40).<br>"
+                        "Try shortening the text or use “Generate QR” instead of “Generate HTML QR.”"
+                        "</p>"), 400
+
+            # Override version with chosen_version
+            version = chosen_version
+
+        else:
+            # Plain QR (no HTML wrapping): use raw_text
+            payload = raw_text
+            # Check capacity of raw_text itself for whichever version the user selected
+            if len(raw_text.encode('utf-8')) > CAPACITY_TABLE[version][ecc]:
+                return f"<h3>Error: data exceeds capacity for Version {version} ECC {ecc}.</h3>", 400
+
+        # Capacity check
+        if action != 'generate_html_qr':
+            if len(raw_text.encode('utf-8')) > CAPACITY_TABLE[version][ecc]:
+                return f"<h3>Error: data exceeds capacity for Version {version} ECC {ecc}.</h3>", 400
+
+            qr_img = generate_qr_img(raw_text, version, ecc, color, logo_file)
+            buf = io.BytesIO()
+            qr_img.save(buf, format='PNG')
+            b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+            return render_template('result.html',
+                                   structured=False, qr=b64, color=color, version=version)
+        else:
+            # Now generate a QR using either 'payload' (HTML‐wrapped) or 'raw_text' (plain)
+            qr_img = generate_qr_img(payload, version, ecc, color, logo_file)
+            buf = io.BytesIO()
+            qr_img.save(buf, format='PNG')
+            b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+            return render_template('result.html',
+                                   structured=False, qr=b64, color=color, version=version)
 
 
 @app.route('/template')

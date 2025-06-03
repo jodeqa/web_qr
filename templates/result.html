@@ -1,65 +1,212 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QR Code Result</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
-        img { max-width: 250px; height: auto; border: 1px solid #ccc; margin: 10px; }
-        .qr-pair { display: inline-block; margin: 10px; }
-        a { display: inline-block; margin-top: 20px; }
-        .download-link { display: block; margin: 5px 0; color: #007bff; text-decoration: none; }
-        .download-link:hover { text-decoration: underline; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Code Result</title>
+  <style>
+    /* ===== Global Styles ===== */
+    * { box-sizing: border-box; }
+    body {
+      background-color: #f4f6f8;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+      text-align: center;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ===== Container ===== */
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h2 {
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: #222;
+    }
+
+    /* ===== QR Card Layout ===== */
+    .qr-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .qr-card {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      width: 240px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .qr-card h4 {
+      margin: 0 0 10px;
+      font-size: 1.1em;
+      color: #444;
+    }
+
+    /* ===== Display Box with Contrasting BG ===== */
+    .qr-display {
+      width: 200px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      background-color: white; /* overridden inline */
+    }
+    .qr-display img {
+      width: 180px;
+      height: 180px;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* ===== Summary Text ===== */
+    .qr-summary {
+      font-size: 0.9em;
+      color: #555;
+      margin-top: 8px;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .qr-summary span {
+      font-weight: 500;
+    }
+
+    /* ===== Button Styles ===== */
+    .btn {
+      display: inline-block;
+      background-color: #007bff;
+      color: white;
+      font-weight: 500;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+      margin-top: 8px;
+      text-align: center;
+    }
+    .btn:hover { background-color: #0056b3; }
+    .btn:active { transform: translateY(1px); }
+
+    /* ===== Footer Links ===== */
+    .footer-links {
+      margin-top: 30px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .footer-links a {
+      color: #007bff;
+      font-weight: 500;
+    }
+    .footer-links a:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
-    <h2>Your QR Code</h2>
-    {% if structured %}
-        <div class="qr-pair">
-            <h4>vCard + Medical</h4>
-            <img id="vcardImg" src="data:image/png;base64,{{ qr_vcard }}" alt="vCard QR" />
-            <a class="download-link" href="data:image/png;base64,{{ qr_vcard }}" download="vcard_qr.png">Download vCard QR</a>
-        </div>
-        <div class="qr-pair">
-            <h4>Metadata</h4>
-            <img id="metaImg" src="data:image/png;base64,{{ qr_meta }}" alt="Metadata QR" />
-            <a class="download-link" href="data:image/png;base64,{{ qr_meta }}" download="metadata_qr.png">Download Metadata QR</a>
-        </div>
-    {% else %}
-        <img id="singleQrImg" src="data:image/png;base64,{{ qr }}" alt="QR" />
-        <a class="download-link" href="data:image/png;base64,{{ qr }}" download="qr.png">Download QR</a>
-    {% endif %}
+  <div class="container">
+    <h2>Your QR Code Result</h2>
 
-    <div style="margin-top: 30px; text-align: center;">
-      <h3>Download Blank Card Template</h3>
-      <a
-        href="/template?color=white"
-        style="
-          display: inline-block;
-          margin-right: 10px;
-          padding: 8px 16px;
-          background: #007bff;
-          color: white;
-          text-decoration: none;
-          border-radius: 4px;
-        "
-        >Download White Card (for Black QR)</a>
-      <a
-        href="/template?color=black"
-        style="
-          display: inline-block;
-          padding: 8px 16px;
-          background: #007bff;
-          color: white;
-          text-decoration: none;
-          border-radius: 4px;
-        "
-        >Download Black Card (for White QR)</a>
+    <div class="qr-wrapper">
+      {% set modules = 21 + 4 * (version - 1) %}
+      {% set pixels = modules * 10 %}
+      {% set cm_size = modules / 10.0 %}
+
+      {% if structured %}
+        <!-- vCard QR -->
+        <div class="qr-card">
+          <h4>vCard &amp; Medical</h4>
+          <div
+            class="qr-display"
+            style="background-color: {% if color == 'White' %}#000{% else %}#fff{% endif %};"
+          >
+            <img src="data:image/png;base64,{{ qr_vcard }}" alt="vCard QR" />
+          </div>
+          <a
+            href="data:image/png;base64,{{ qr_vcard }}"
+            download="vcard_qr.png"
+            class="btn"
+          >
+            Download vCard QR
+          </a>
+          <div class="qr-summary">
+            <div>Modules: <span>{{ modules }} × {{ modules }}</span> (mm)</div>
+            <div>Pixels: <span>{{ pixels }} × {{ pixels }}</span> (px)</div>
+            <div>
+              Approx: <span>{{ '%.1f'|format(cm_size) }} × {{ '%.1f'|format(cm_size) }}</span> (cm)
+            </div>
+          </div>
+        </div>
+
+        <!-- Metadata QR -->
+        <div class="qr-card">
+          <h4>Metadata</h4>
+          <div
+            class="qr-display"
+            style="background-color: {% if color == 'White' %}#000{% else %}#fff{% endif %};"
+          >
+            <img src="data:image/png;base64,{{ qr_meta }}" alt="Metadata QR" />
+          </div>
+          <a
+            href="data:image/png;base64,{{ qr_meta }}"
+            download="metadata_qr.png"
+            class="btn"
+          >
+            Download Metadata QR
+          </a>
+          <div class="qr-summary">
+            <div>Modules: <span>{{ modules }} × {{ modules }}</span> (mm)</div>
+            <div>Pixels: <span>{{ pixels }} × {{ pixels }}</span> (px)</div>
+            <div>
+              Approx: <span>{{ '%.1f'|format(cm_size) }} × {{ '%.1f'|format(cm_size) }}</span> (cm)
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <!-- Single QR -->
+        <div class="qr-card">
+          <h4>QR Code</h4>
+          <div
+            class="qr-display"
+            style="background-color: {% if color == 'White' %}#000{% else %}#fff{% endif %};"
+          >
+            <img src="data:image/png;base64,{{ qr }}" alt="QR" />
+          </div>
+          <a href="data:image/png;base64,{{ qr }}" download="qr.png" class="btn">
+            Download QR
+          </a>
+          <div class="qr-summary">
+            <div>Modules: <span>{{ modules }} × {{ modules }}</span> (mm)</div>
+            <div>Pixels: <span>{{ pixels }} × {{ pixels }}</span> (px)</div>
+            <div>
+              Approx: <span>{{ '%.1f'|format(cm_size) }} × {{ '%.1f'|format(cm_size) }}</span> (cm)
+            </div>
+          </div>
+        </div>
+      {% endif %}
     </div>
 
-    <div>
-        <a href="/">← Generate Another</a>
+    <!-- Blank Card Template Buttons -->
+    <div class="footer-links">
+      <a href="/template?color=white" class="btn">Download White Card Template</a>
+      <a href="/template?color=black" class="btn">Download Black Card Template</a>
     </div>
+    <div class="footer-links" style="margin-top: 15px;">
+      <a href="/">← Generate Another</a>
+    </div>
+  </div>
 </body>
 </html>

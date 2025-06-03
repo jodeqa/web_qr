@@ -5,181 +5,339 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QR Code Generator</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .tabs { margin-bottom: 20px; }
+    /* ===== Global Resets & Fonts ===== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #eef2f5;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: #333;
+      padding: 20px;
+      line-height: 1.5;
+    }
+
+    /* ===== Centered Container ===== */
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-weight: 600;
+      color: #222;
+    }
+
+    /* ===== Tabs ===== */
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #ccc;
+      margin-bottom: 20px;
+    }
     .tabs button {
-      padding: 10px 20px;
-      margin-right: 5px;
+      flex: 1;
+      padding: 12px 0;
+      background: #f7f7f8;
+      border: none;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
       cursor: pointer;
-      border: 1px solid #ccc;
-      background: #f7f7f7;
-      border-bottom: none;
+      font-size: 1em;
+      color: #555;
+      transition: background 0.2s;
+    }
+    .tabs button:not(:last-child) {
+      border-right: 1px solid #ccc;
     }
     .tabs button.active {
-      background: white;
-      border-bottom: 1px solid white;
+      background: #fff;
+      color: #222;
+      border-bottom: 2px solid #fff;
     }
-    .tab-content {
+    .tabs button:hover {
+      background: #e1e3e6;
+    }
+
+    /* ===== Form “Card” ===== */
+    .form-card {
+      background: #fff;
       border: 1px solid #ccc;
+      border-radius: 6px;
       padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    /* ===== Tab Content ===== */
+    .tab-content {
       display: none;
-      background: white;
     }
-    .tab-content.active { display: block; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    select, input[type=text], textarea, input[type=file], input[type=password] {
-      width: 300px; padding: 5px; margin-top: 5px;
+    .tab-content.active {
+      display: block;
     }
-    #dimensionDisplay, #counter { margin-top: 5px; font-size: 0.9em; color: #555; }
+
+    /* ===== Form Fields ===== */
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: 500;
+      color: #444;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="file"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      margin-top: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1em;
+      transition: border-color 0.2s;
+      background-color: #fafafb;
+    }
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #007bff;
+      background-color: #fff;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    /* ===== Counter & Dimension Display ===== */
+    .info-text {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 6px;
+    }
+
+    /* ===== Buttons ===== */
+    .btn {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 12px 24px;
+      margin-top: 20px;
+      font-size: 1em;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      display: inline-block;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+    }
+    .btn:active {
+      transform: translateY(1px);
+    }
+    .btn + .btn {
+      margin-left: 10px;
+    }
+
+    /* ===== Footer Links ===== */
+    .footer-links {
+      margin-top: 30px;
+      text-align: center;
+    }
+    .footer-links a {
+      color: #007bff;
+      font-weight: 500;
+      margin: 0 10px;
+    }
+    .footer-links a:hover {
+      text-decoration: underline;
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 600px) {
+      .tabs {
+        flex-direction: column;
+      }
+      .tabs button:not(:last-child) {
+        border-right: none;
+        border-bottom: 1px solid #ccc;
+      }
+      .tabs button {
+        border-radius: 0;
+      }
+      .tabs button.active {
+        border-bottom: none;
+      }
+    }
   </style>
 </head>
 <body>
-  <h2>QR Code Generator</h2>
+  <div class="container">
+    <h2>QR Code Generator</h2>
 
-  <div class="tabs">
-    <button data-tab="freeTextTab" class="active">Free Text</button>
-    <button data-tab="emergencyTab">Emergency Info</button>
-    <button data-tab="structuredTab">Structured vCard/Medical</button>
-    <button data-tab="secureTab">Secure Data (PIN)</button>
+    <div class="tabs">
+      <button data-tab="freeTextTab" class="active">Free Text</button>
+      <button data-tab="emergencyTab">Emergency Info</button>
+      <button data-tab="structuredTab">Structured vCard/Medical</button>
+      <button data-tab="secureTab">Secure Data (PIN)</button>
+    </div>
+
+    <div class="form-card">
+      <form id="qrForm" action="/generate" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="mode" id="mode" value="free_text" />
+
+        <!-- ========== Free Text Tab ========== -->
+        <div id="freeTextTab" class="tab-content active">
+          <label for="ft_text">Text to Encode:</label>
+          <textarea id="ft_text" name="ft_text" placeholder="Enter up to max chars..."></textarea>
+          <div id="counter_ft" class="info-text">Remaining: – characters</div>
+        </div>
+
+        <!-- ========== Emergency Info Tab ========== -->
+        <div id="emergencyTab" class="tab-content">
+          <label for="em_name">Full Name:</label>
+          <input type="text" id="em_name" name="em_name" placeholder="John Doe" />
+
+          <label for="em_address">Address:</label>
+          <input type="text" id="em_address" name="em_address" placeholder="123 Main St, City" />
+
+          <label for="em_family_name">Family Name:</label>
+          <input type="text" id="em_family_name" name="em_family_name" placeholder="Jane Doe" />
+
+          <label for="em_family_phone">Family Phone:</label>
+          <input type="text" id="em_family_phone" name="em_family_phone" placeholder="+62-812-3456-7890" />
+
+          <label for="em_blood">Blood Type:</label>
+          <select id="em_blood" name="em_blood">
+            {% for bt in blood_types %}
+              <option value="{{ bt }}">{{ bt }}</option>
+            {% endfor %}
+          </select>
+
+          <label for="em_history">Health History:</label>
+          <textarea id="em_history" name="em_history" placeholder="Allergies, conditions..."></textarea>
+          <div id="counter_em" class="info-text">&nbsp;</div>
+        </div>
+
+        <!-- ========== Structured vCard/Medical Tab ========== -->
+        <div id="structuredTab" class="tab-content">
+          <label for="sv_name">Name:</label>
+          <input type="text" id="sv_name" name="sv_name" placeholder="John Doe" />
+
+          <label for="sv_phone">Phone:</label>
+          <input type="text" id="sv_phone" name="sv_phone" placeholder="+62-812-3456-7890" />
+
+          <label for="sv_address">Address:</label>
+          <input type="text" id="sv_address" name="sv_address" placeholder="123 Main St, City" />
+
+          <label for="sv_email">Email:</label>
+          <input type="text" id="sv_email" name="sv_email" placeholder="jdoe@example.com" />
+
+          <label for="sv_blood">Blood Type:</label>
+          <select id="sv_blood" name="sv_blood">
+            {% for bt in blood_types %}
+              <option value="{{ bt }}">{{ bt }}</option>
+            {% endfor %}
+          </select>
+
+          <label for="sv_allergies">Allergies:</label>
+          <input type="text" id="sv_allergies" name="sv_allergies" placeholder="Penicillin, Peanuts" />
+
+          <label for="sv_medications">Medications:</label>
+          <input type="text" id="sv_medications" name="sv_medications" placeholder="Metformin, Lisinopril" />
+
+          <label for="sv_conditions">Chronic Conditions:</label>
+          <input type="text" id="sv_conditions" name="sv_conditions" placeholder="Hypertension, Diabetes" />
+
+          <label for="sv_doctor">Primary Doctor:</label>
+          <input type="text" id="sv_doctor" name="sv_doctor" placeholder="Dr. Rina" />
+
+          <label for="sv_doctor_phone">Doctor Phone:</label>
+          <input type="text" id="sv_doctor_phone" name="sv_doctor_phone" placeholder="+62-21-1234-5678" />
+          <div id="counter_sv" class="info-text">&nbsp;</div>
+        </div>
+
+        <!-- ========== Secure Data Tab ========== -->
+        <div id="secureTab" class="tab-content">
+          <label for="sc_name">Name:</label>
+          <input type="text" id="sc_name" name="sc_name" placeholder="John Doe" />
+
+          <label for="sc_address">Address:</label>
+          <input type="text" id="sc_address" name="sc_address" placeholder="123 Main St, City" />
+
+          <label for="sc_ec_name">Emergency Contact Name:</label>
+          <input type="text" id="sc_ec_name" name="sc_ec_name" placeholder="Jane Doe" />
+
+          <label for="sc_ec_phone">Emergency Contact Phone:</label>
+          <input type="text" id="sc_ec_phone" name="sc_ec_phone" placeholder="+62-812-3456-7890" />
+
+          <label for="sc_medical">Medical Info:</label>
+          <textarea id="sc_medical" name="sc_medical" placeholder="Allergies, insurances..."></textarea>
+
+          <label for="sc_blood">Blood Type:</label>
+          <select id="sc_blood" name="sc_blood">
+            {% for bt in blood_types %}
+              <option value="{{ bt }}">{{ bt }}</option>
+            {% endfor %}
+          </select>
+
+          <label for="sc_pin">PIN (4–8 digits):</label>
+          <input type="password" id="sc_pin" name="sc_pin" maxlength="8" />
+          <div id="counter_sc" class="info-text">&nbsp;</div>
+        </div>
+
+        <!-- ========== Common Controls ========== -->
+        <label for="version">QR Version:</label>
+        <select name="version" id="version">
+          {% for v in versions %}
+            <option value="{{ v }}">Version {{ v }}</option>
+          {% endfor %}
+        </select>
+        <div id="dimensionDisplay" class="info-text">Dimensions: – mm × – mm</div>
+
+        <label for="ecc">Error Correction Level:</label>
+        <select name="ecc" id="ecc">
+          {% for e in ecc_choices %}
+            <option value="{{ e }}">{{ e }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="color">QR Color:</label>
+        <select name="color" id="color">
+          {% for c in color_choices %}
+            <option value="{{ c }}">{{ c }}</option>
+          {% endfor %}
+        </select>
+        <div class="info-text">
+          "Black" = black modules on transparent (for light backgrounds).<br>
+          "White" = white modules on transparent (for dark backgrounds).
+        </div>
+
+        <label for="logo">Center Logo (optional):</label>
+        <input type="file" name="logo" id="logo" accept="image/*" />
+
+        <!-- Generate Buttons -->
+        <div style="text-align:center;">
+          <button type="submit" name="action" value="generate_qr" class="btn">
+            Generate QR
+          </button>
+          <button type="submit" name="action" value="generate_html_qr" class="btn">
+            Generate HTML QR
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Footer Links -->
+    <div class="footer-links">
+      <a href="/template?color=white">Download White Card Template</a>
+      <a href="/template?color=black">Download Black Card Template</a>
+      <a href="/" style="margin-left:30px;">← Generate Another</a>
+    </div>
   </div>
-
-  <form id="qrForm" action="/generate" method="POST" enctype="multipart/form-data">
-    <input type="hidden" name="mode" id="mode" value="free_text" />
-
-    <!-- ========== Free Text Tab ========== -->
-    <div id="freeTextTab" class="tab-content active">
-      <label>Text to Encode:</label>
-      <textarea id="ft_text" rows="4" placeholder="Enter up to max chars..."></textarea>
-      <div id="counter_ft">Remaining: – characters</div>
-    </div>
-
-    <!-- ========== Emergency Info Tab ========== -->
-    <div id="emergencyTab" class="tab-content">
-      <label>Full Name:</label>
-      <input type="text" id="em_name" name="em_name" placeholder="John Doe" />
-
-      <label>Address:</label>
-      <input type="text" id="em_address" name="em_address" placeholder="123 Main St, City" />
-
-      <label>Family Name:</label>
-      <input type="text" id="em_family_name" name="em_family_name" placeholder="Jane Doe" />
-
-      <label>Family Phone:</label>
-      <input type="text" id="em_family_phone" name="em_family_phone" placeholder="+62-812-3456-7890" />
-
-      <label>Blood Type:</label>
-      <select id="em_blood" name="em_blood">
-        {% for bt in blood_types %}
-          <option value="{{ bt }}">{{ bt }}</option>
-        {% endfor %}
-      </select>
-
-      <label>Health History:</label>
-      <textarea id="em_history" name="em_history" rows="3" placeholder="Allergies, conditions..."></textarea>
-      <div id="counter_em">&nbsp;</div>
-    </div>
-
-    <!-- ========== Structured vCard/Medical Tab ========== -->
-    <div id="structuredTab" class="tab-content">
-      <label>Name:</label>
-      <input type="text" id="sv_name" name="sv_name" placeholder="John Doe" />
-
-      <label>Phone:</label>
-      <input type="text" id="sv_phone" name="sv_phone" placeholder="+62-812-3456-7890" />
-
-      <label>Address:</label>
-      <input type="text" id="sv_address" name="sv_address" placeholder="123 Main St, City" />
-
-      <label>Email:</label>
-      <input type="text" id="sv_email" name="sv_email" placeholder="jdoe@example.com" />
-
-      <label>Blood Type:</label>
-      <select id="sv_blood" name="sv_blood">
-        {% for bt in blood_types %}
-          <option value="{{ bt }}">{{ bt }}</option>
-        {% endfor %}
-      </select>
-
-      <label>Allergies:</label>
-      <input type="text" id="sv_allergies" name="sv_allergies" placeholder="Penicillin, Peanuts" />
-
-      <label>Medications:</label>
-      <input type="text" id="sv_medications" name="sv_medications" placeholder="Metformin, Lisinopril" />
-
-      <label>Chronic Conditions:</label>
-      <input type="text" id="sv_conditions" name="sv_conditions" placeholder="Hypertension, Diabetes" />
-
-      <label>Primary Doctor:</label>
-      <input type="text" id="sv_doctor" name="sv_doctor" placeholder="Dr. Rina" />
-
-      <label>Doctor Phone:</label>
-      <input type="text" id="sv_doctor_phone" name="sv_doctor_phone" placeholder="+62-21-1234-5678" />
-
-      <div id="counter_sv">&nbsp;</div>
-    </div>
-
-    <!-- ========== Secure Data Tab ========== -->
-    <div id="secureTab" class="tab-content">
-      <label>Name:</label>
-      <input type="text" id="sc_name" name="sc_name" placeholder="John Doe" />
-
-      <label>Address:</label>
-      <input type="text" id="sc_address" name="sc_address" placeholder="123 Main St, City" />
-
-      <label>Emergency Contact Name:</label>
-      <input type="text" id="sc_ec_name" name="sc_ec_name" placeholder="Jane Doe" />
-
-      <label>Emergency Contact Phone:</label>
-      <input type="text" id="sc_ec_phone" name="sc_ec_phone" placeholder="+62-812-3456-7890" />
-
-      <label>Medical Info:</label>
-      <textarea id="sc_medical" name="sc_medical" rows="3" placeholder="Allergies, insurances..."></textarea>
-
-      <label>Blood Type:</label>
-      <select id="sc_blood" name="sc_blood">
-        {% for bt in blood_types %}
-          <option value="{{ bt }}">{{ bt }}</option>
-        {% endfor %}
-      </select>
-
-      <label>PIN (4–8 digits):</label>
-      <input type="password" id="sc_pin" name="sc_pin" maxlength="8" />
-      <div id="counter_sc">&nbsp;</div>
-    </div>
-
-    <!-- ========== Common Controls ========== -->
-    <label>QR Version:</label>
-    <select name="version" id="version">
-      {% for v in versions %}
-        <option value="{{ v }}">Version {{ v }}</option>
-      {% endfor %}
-    </select>
-    <div id="dimensionDisplay">Dimensions: – mm × – mm</div>
-
-    <label>Error Correction Level:
-      <select name="ecc" id="ecc">
-        {% for e in ecc_choices %}
-          <option value="{{ e }}">{{ e }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <label>QR Color:</label>
-    <select name="color" id="color">
-      {% for c in color_choices %}
-        <option value="{{ c }}">{{ c }}</option>
-      {% endfor %}
-    </select>
-    <div id="colorHint" style="font-size:0.9em;color:#555;">
-      "Black" = black modules on transparent (for light backgrounds).<br>
-      "White" = white modules on transparent (for dark backgrounds).
-    </div>
-
-    <label>Center Logo (optional):</label>
-    <input type="file" name="logo" id="logo" accept="image/*" />
-
-    <button type="submit" style="margin-top:20px;padding:10px 20px;">Generate QR</button>
-  </form>
 
   <script>
     // ===== Tab switching =====
@@ -195,7 +353,7 @@
       updateVersionBasedOnLength();
     }));
 
-    // ===== Capacity table in JS (same as backend) =====
+    // ===== Capacity table in JS (mirrors backend) =====
     const CAP_TABLE = {
       1:  { L:17,  M:14,  Q:11,  H:7  },
       2:  { L:32,  M:26,  Q:20,  H:14 },
@@ -244,8 +402,9 @@
       const mode = document.getElementById('mode').value;
       const ecc = document.getElementById('ecc').value;
       let length = 0;
+
       if (mode === 'freeText') {
-        length = new TextEncoder().encode(ft_text.value).length;
+        length = new TextEncoder().encode(ftEl.value).length;
       } else if (mode === 'emergency') {
         const obj = {
           name: document.getElementById('em_name').value.trim(),
@@ -305,14 +464,15 @@
         // secure: skip auto-version
         return;
       }
-      // Now find the smallest version where CAP_TABLE[version][ecc] >= length
+
+      // Find smallest version that fits
       for (let v = 1; v <= 40; v++) {
         if (CAP_TABLE[v][ecc] >= length) {
           document.getElementById('version').value = v;
           return;
         }
       }
-      // If none found, set to 40 (max) and let the error appear on generate
+      // If none fit, set to 40 (largest)
       document.getElementById('version').value = 40;
     }
 
@@ -409,7 +569,7 @@
         hidden.value = JSON.stringify(obj);
         form.appendChild(hidden);
       }
-      // structured and secure handled server-side
+      // structured and secure are handled server-side
     });
 
     // ===== Initial load =====
