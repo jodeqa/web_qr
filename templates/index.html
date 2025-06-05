@@ -403,7 +403,7 @@
       const ecc = document.getElementById('ecc').value;
       let length = 0;
 
-      if (mode === 'freeText') {
+      if (mode === 'free_text') {
         length = new TextEncoder().encode(ftEl.value).length;
       } else if (mode === 'emergency') {
         const obj = {
@@ -466,14 +466,25 @@
       }
 
       // Find smallest version that fits
+      let chosenV = null;
       for (let v = 1; v <= 40; v++) {
         if (CAP_TABLE[v][ecc] >= length) {
-          document.getElementById('version').value = v;
-          return;
+          chosenV = v;
+          break;
         }
       }
-      // If none fit, set to 40 (largest)
-      document.getElementById('version').value = 40;
+      if (chosenV === null) {
+        chosenV = 40;
+      }
+
+      // Only update version dropdown if it actually changed
+      const versionEl = document.getElementById('version');
+      if (parseInt(versionEl.value) !== chosenV) {
+        console.log("Auto‐setting version to", chosenV, "for length", length);
+        versionEl.value = chosenV;
+        // Now that version changed, we need to refresh capacity (dimensions + max_chars)
+        updateCapacity();
+      }
     }
 
     // ===== Capacity / Character Counter =====
@@ -508,7 +519,7 @@
 
     function updateCounter() {
       const mode = document.getElementById('mode').value;
-      if (mode === 'freeText') {
+      if (mode === 'free_text') {
         const rem = maxChars - ftEl.value.length;
         counterFtEl.textContent = `Remaining: ${rem} characters`;
       } else {
@@ -545,7 +556,7 @@
     form.addEventListener('submit', e => {
       const mode = document.getElementById('mode').value;
 
-      if (mode === 'freeText') {
+      if (mode === 'free_text') {
         let hidden = document.createElement('input');
         hidden.type = 'hidden';
         hidden.name = 'text';
