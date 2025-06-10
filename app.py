@@ -7,9 +7,17 @@ import base64
 import json
 import datetime
 import os
+
+# On Development
 from Cryptodome.Cipher import AES
 from Cryptodome.Protocol.KDF import PBKDF2
 from Cryptodome.Random import get_random_bytes
+
+# On Production
+# from Crypto.Cipher import AES
+# from Crypto.Protocol.KDF import PBKDF2
+# from Crypto.Random import get_random_bytes
+
 import urllib.parse
 import html as html_escape_module
 
